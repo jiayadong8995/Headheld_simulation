@@ -45,22 +45,43 @@
 **明确不做**（与任务书一致）：双侧差速/转向、滚刷旋转动力学、位置刚度项、母线电流模型（因此不输出电耗/发热）、
 PMSM 电磁建模。
 
-**体系结构**（`docs/architecture.png`，矢量版 `docs/architecture.svg`）：
+**体系结构**：控制论视角见 `docs/control_block_diagram.png`，工程模块视角见 `docs/simulation_architecture.png`（均附 `.svg` 矢量版）。
 
-信号流为**蛇形单向回路**，所有连线正交走线、走廊与方框分离，无交叉与穿框。
+信号流为**单向回路**，所有连线正交走线、走廊与方框分离；两张图均已通过程序化几何检测（正交线段交叉 0 处）。
+
+**控制框图**（`docs/control_block_diagram.png`）——按控制论语义绘制：
 
 ```
-Row 1（左→右）  人机模型 ──F_h──▶ 被控对象 Plant ──真值──▶ 传感器 Sensors ──测量──▶ 状态估计 Estimator
-                                    ▲                                                    │
-                                    │ F_m                                                │ v̂, â
-                                    │                                                    ▼
-Row 2（右→左）  执行器 Actuator ◀── 统一安全外壳 ◀──F_cmd_raw── 控制器组 C0–C5 ◀───────────┘
-                                    （门控 + 限幅）
+人手模型 F_h ─┐                                ┌─ 位置积分 1/s ──▶ x
+              ├─▶ Σ ──▶ 1/(m s) ──▶ v ──┬──────┘
+执行器 F_m ───┘   ▲                     │
+阻力 D(v,t) ──────┘(减)                  │ 真值 x, v, a（a = v̇）
+                                         ▼
+        传感器 ──▶ 状态估计 ──▶ 控制器 C(s) ──▶ 统一安全外壳 ──▶ 执行器
+        （噪声/量化/延迟/丢帧）   (v̂, â)         ▲ 门控 g_a,g_v,g_D  ┘
+```
+
+扰动输入 `F_h`（人手）与 `-D(v,t)`（阻力）在求和点 Σ 与执行力 `F_m` 合成 `F_net`；
+反馈回路 被控对象 → 传感器 → 状态估计 → 控制器 → 安全外壳 → 执行器 → Σ 闭合。
+人手模型的**闭环虚拟用户**由 `x, v` 虚线观测回到自身（蓝色虚线）。
+
+**仿真架构图**（`docs/simulation_architecture.png`）——按工程模块语义绘制，分 5 层：
+
+```
+① 配置层 config/           base.yaml（参数+来源标注） ｜ scenarios.yaml（S01–S12 / T1–T3）
+② 运行入口 run.py          --scenario / --milestone / --sweep / --monte-carlo / --standstill-screen
+                          辅助：contributions.py（消融）· analysis.py（汇总）· make_report_html.py
+③ 仿真内核（真值隔离）      传感器 → 状态估计 → 控制器 → 安全外壳 → 执行器
+                            ▲                                        │
+                            └──────── 被控对象 plant.py ◀────────────┘   （真值只写入日志）
+                           人手模型 human.py 注入被控对象
+④ 验证栈                  tests/ + metrics.py：27 单测 / 6 组硬性检查（含真值隔离静态扫描）
+                           M1 解析辨识 · M2 场景矩阵 · M3 扫参 + MC300 · 4800 次站立安全筛查
+⑤ 产物                    outputs/（可再生）→ results/（归档 102 图 + CSV）→ docs/（报告与框图）
 ```
 
 真值只在**仿真世界**边界内流动，控制器 / 估计器 / 传感器 / 执行器均不导入 `plant`；
-仅 C4a/C4b/C5_oracle 走显式 oracle 通道（红色虚线，标注为不可部署）。
-真值与 `F_cmd`、状态机日志统一送入边界外的**离线评价器**读取，不参与实时控制。
+仅 C4a/C4b/C5_oracle 走显式 oracle 通道（标注为不可部署）。
 
 ---
 
@@ -362,13 +383,15 @@ python run.py --standstill-screen 300 --seed 20261012   # 独立站立安全筛�
 python contributions.py                             # 贡献分离
 python analysis.py outputs/M2_full outputs/M3_param_study
 python make_report_html.py                          # 自包含 HTML 报告
-python make_architecture_diagram.py                 # 架构框图（png + svg）
+python make_control_block_diagram.py                # 控制框图（png + svg）
+python make_simulation_architecture.py              # 仿真架构图（png + svg）
 pytest -q                                           # 27 passed
 ```
 
 | 文件 | 内容 |
 |---|---|
-| `docs/architecture.png` | 控制与验证架构框图（本文 §1，矢量版 `docs/architecture.svg`） |
+| `docs/control_block_diagram.png` | 控制框图：求和点 / 传递函数 / 扰动回路（本文 §1） |
+| `docs/simulation_architecture.png` | 仿真架构图：模块映射 / 运行回路 / 验证栈 / 产物（本文 §1） |
 | `technical_report.md` | 详细技术报告：方法、逐场景分析、7 问完整推导、参数来源 |
 | `docs/report.html` | 自包含 HTML 报告（图片内嵌，可离线/打印） |
 | `results/metrics/*.csv` | 全部指标表（场景、耦合、扫参、网格、MC、安全筛查、ablation） |
