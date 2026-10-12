@@ -22,11 +22,20 @@ def _fmt(df: pd.DataFrame, cols=None, digits=3) -> str:
     return d.to_markdown(index=False)
 
 
+def _read(path: Path, **kw):
+    """安全读取 CSV：空文件/无列时返回 None。"""
+    try:
+        df = pd.read_csv(path, **kw)
+        return df if len(df.columns) else None
+    except Exception:
+        return None
+
+
 def summarise_run(run_dir: Path) -> str:
     out = [f"## 运行目录 `{run_dir}`\n"]
     metrics = run_dir / "scenarios_metrics.csv"
-    if metrics.exists():
-        d = pd.read_csv(metrics)
+    if metrics.exists() and _read(metrics) is not None:
+        d = _read(metrics)
         out.append("### 1. 场景 × 控制器 关键指标（力给定试验）\n")
         cols = ["scenario", "controller", "F_h_rms", "F_h_peak", "W_h_plus", "RMSE_v", "RMSE_v_rel",
                 "M_eff_fit", "B_eff_fit", "fit_R2", "v_peak", "a_peak", "jerk_rms",
@@ -42,8 +51,8 @@ def summarise_run(run_dir: Path) -> str:
                               "extra_travel_after_release_m", "stop_time_s", "jerk_peak"]))
         out.append("")
     coupled = run_dir / "coupled_metrics.csv"
-    if coupled.exists():
-        d = pd.read_csv(coupled)
+    if coupled.exists() and _read(coupled) is not None:
+        d = _read(coupled)
         if "task" in d.columns:
             d = d[d.task.notna()]
         out.append("### 3. 人机耦合轨迹任务：相同任务下的人手负担\n")
@@ -56,8 +65,8 @@ def summarise_run(run_dir: Path) -> str:
                             "task_pos_err_final", "jerk_rms", "F_m_rms", "state_switches"]))
         out.append("")
     sweep = run_dir / "sweep_metrics.csv"
-    if sweep.exists():
-        d = pd.read_csv(sweep)
+    if sweep.exists() and _read(sweep) is not None:
+        d = _read(sweep)
         out.append("### 4. 单因素扫参（按场景分组，勿跨场景平均）\n")
         agg = d.groupby(["sweep", "scenario", "level"], as_index=False).agg(
             F_h_rms=("F_h_rms", "mean"), v_peak=("v_peak", "mean"),
@@ -71,14 +80,14 @@ def summarise_run(run_dir: Path) -> str:
                         ("grid_stop_time_s.csv", "K_a/m × B_d 网格：松手停稳时间 [s]"),
                         ("grid_jerk_rms.csv", "K_a/m × B_d 网格：带限 jerk RMS")):
         p = run_dir / name
-        if p.exists():
+        if p.exists() and _read(p) is not None:
             out.append(f"### 5. {title}\n")
-            g = pd.read_csv(p, index_col=0)
+            g = _read(p, index_col=0)
             out.append(g.round(3).to_markdown())
             out.append("")
     rob = run_dir / "robustness_summary.csv"
-    if rob.exists():
-        d = pd.read_csv(rob)
+    if rob.exists() and _read(rob) is not None:
+        d = _read(rob)
         key = [c for c in d.columns if c.endswith("_mean") or c.endswith("_p95") or c.endswith("_worst")]
         keep = ["scenario", "controller", "n"] + [c for c in key if any(
             k in c for k in ("F_h_rms", "F_h_peak", "stop_time", "extra_travel",
@@ -87,20 +96,36 @@ def summarise_run(run_dir: Path) -> str:
         out.append("### 6. Monte Carlo 鲁棒性汇总（配对样本，mean/P95/worst）\n")
         out.append(_fmt(d, keep))
         out.append("")
-    cand = run_dir / "mc_candidate_means.csv"
-    if cand.exists():
+    ab = run_dir / "ablation_metrics.csv"
+    if ab.exists() and _read(ab) is not None:
+        d = _read(ab)
+        out.append("### 5b. 贡献分离（ablation）\n")
+        out.append(_fmt(d, ["case", "variant", "F_h_rms", "F_h_peak", "W_h_plus", "v_peak",
+                            "RMSE_v_rel", "extra_travel_after_release_m", "stop_time_s",
+                            "jerk_rms", "F_m_rms", "osc_index", "task_pos_err_final"]))
+        out.append("")
+    cand_path = run_dir / "mc_candidate_means.csv"
+    if cand_path.exists() and _read(cand_path) is not None:
+        cand = _read(cand_path)
         out.append("### 7. 候选参数（300 组随机工况下的均值/P95）\n")
         out.append(_fmt(cand.sort_values("F_h_rms_mean"),
                         ["candidate", "n_samples", "F_h_rms_mean", "F_h_rms_p95",
-                         "F_h_peak_mean", "W_h_plus_mean", "jerk_rms_mean", "jerk_rms_p95",
+                         "improve_vs_C1_mean", "improve_vs_C0_mean", "F_h_peak_mean",
+                         "W_h_plus_mean", "jerk_rms_mean", "jerk_rms_p95",
                          "osc_index_mean", "sat_ratio_mean", "F_m_rms_mean",
-                         "task_pos_err_final_mean", "extra_travel_after_release_m_mean"]))
+                         "task_pos_err_final_mean", "extra_travel_after_release_m_mean",
+                         "extra_travel_after_release_m_worst"]))
+        out.append("")
+    st = run_dir / "mc_standstill_summary.csv"
+    if st.exists() and _read(st) is not None:
+        out.append("### 8b. 独立站立不自走筛查（4800 次）\n")
+        out.append(_fmt(_read(st)))
         out.append("")
     for name, title in (("mc_candidates_rejected.csv", "被安全筛选剔除的样本（原因分布）"),
                         ("mc_candidates_safe.csv", "通过安全筛选的样本数")):
         p = run_dir / name
-        if p.exists():
-            d = pd.read_csv(p)
+        if p.exists() and _read(p) is not None:
+            d = _read(p)
             out.append(f"### 8. {title}\n")
             if "fail_reasons" in d.columns and len(d):
                 out.append(d.fail_reasons.value_counts().to_markdown())

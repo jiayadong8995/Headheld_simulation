@@ -116,11 +116,22 @@ pytest -q
 
 | 里程碑 | 内容 | 产物 |
 |---|---|---|
-| **M1** | S01/S02 + C0/C2，理想力对象解析验证 | `outputs/M1_*`（`figures/S01_overlay.png` 等） |
-| **M2** | S01–S12 + C0/C1/C2/C3，真实摩擦/滚刷/限幅/融合/耦合任务 | `outputs/M2_full/`（`scenarios_metrics.csv`、`coupled_metrics.csv`） |
-| **M3** | 扫参 + 网格 + 300 组 Monte Carlo + Pareto 推荐 | `outputs/M3_*/`（`recommended_params.yaml`、`robustness_summary.csv`） |
+| **M1** | S01/S02 + C0/C2，理想力对象解析验证（`M_eff=2.591` vs 理论 2.6、`B_eff=3.979` vs 4.0、`RMSE_v/v_ref=0.73 % < 2 %`、正反精确镜像） | `pytest -q`（27 passed） |
+| **M2** | S01–S12 + C0/C1/C2/C3，真实摩擦/滚刷/限幅/融合 + 耦合任务 T1/T2 × 3 组虚拟人（96 次耦合试验） | `outputs/M2_full/`（`scenarios_metrics.csv`、`coupled_metrics.csv`、84 张图） |
+| **M3** | 单因素/两因素扫参 + **300 组 Monte Carlo**（配对样本）+ **4800 次站立安全筛查** + Pareto 推荐 | `outputs/M3_param_study/`（`recommended_params.yaml`、`robustness_summary.csv`、`mc_standstill_summary.csv`） |
+| 附加 | 贡献分离实验（速度阻尼 / 加速度反馈 / 阻力补偿的净效果） | `outputs/contributions/ablation_metrics.csv` |
 
-结论、图表解读与**待实机测量清单**见 `technical_report.md`。
+**结论速览**（完整推导与逐条回答 7 个问题见 `technical_report.md`）：
+
+- 速度阻尼 `-B_d·v̂` 是**停稳能力的唯一来源**（松手滑行 0.75–0.89 m → 0.036–0.12 m，停稳 2.6 s → 1.2–1.4 s），
+  代价是恒定速度段**人手多付 1–1.5 N**（耦合任务 RMS 手力 +20～28 %）；
+- 加速度反馈 `K_a·â` **单独使用净负收益**（停不稳 + 更费力 + 电机更累），必须与阻尼成对使用；
+- 阻力补偿 `α_D·D̂` 是**唯一能把这部分代价还给人手**的项：`α_D=0.5` 时 T2 任务手力比 C1 优 9 %，
+  但 `α_D=1.0` 会过补偿（松手滑行放大到最差 1.7–2.0 m、T1 停稳回到 2.72 s）；
+- **推荐主参数**：`C3，K_a=0.8 kg（K_a/m=0.20），B_d=4.0 N·s/m，α_D=0.5`（首选平衡）；
+  `C2，K_a=1.4/B_d=4.0`（安全优先/降级模式，停稳最强但手力 −20 %）；
+- **诚实结论**：在全部为 ASSUMED 参数、300 组随机工况下，最优参数组仅 **63 % 的样本优于 C1（均值 +1.2 %，尾部 −44 %）**
+  —— 仿真**不支持"装上就一定省力"**，上机前必须按第 7 节清单完成标定并重跑 M3（一条命令，约 15 min）。
 
 ## 6. 待实机测量清单（仿真无法替代）
 
