@@ -32,6 +32,9 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 首次
 # 把输出汇总成报告用的 Markdown 数据表
 .venv/bin/python analysis.py outputs/M2_full outputs/M3_param_study
 
+# 生成自包含 HTML 报告（图片 base64 内嵌，单文件可离线打开/打印）
+.venv/bin/python make_report_html.py            # → outputs/report.html
+
 # 单场景 / 全部场景
 .venv/bin/python run.py --scenario S03 --controllers C0,C1,C2,C3 --config config/base.yaml
 .venv/bin/python run.py --scenario all --controllers C0,C1,C2,C3
@@ -116,7 +119,7 @@ pytest -q
 
 | 里程碑 | 内容 | 产物 |
 |---|---|---|
-| **M1** | S01/S02 + C0/C2，理想力对象解析验证（`M_eff=2.591` vs 理论 2.6、`B_eff=3.979` vs 4.0、`RMSE_v/v_ref=0.73 % < 2 %`、正反精确镜像） | `pytest -q`（27 passed） |
+| **M1** | S01/S02 + C0/C2，理想力对象解析验证（`M_eff=2.591` vs 理论 2.6、`B_eff=3.978` vs 4.0、`RMSE_v/v_ref=0.73 % < 2 %`、正反精确镜像） | `pytest -q`（27 passed） |
 | **M2** | S01–S12 + C0/C1/C2/C3，真实摩擦/滚刷/限幅/融合 + 耦合任务 T1/T2 × 3 组虚拟人（96 次耦合试验） | `outputs/M2_full/`（`scenarios_metrics.csv`、`coupled_metrics.csv`、84 张图） |
 | **M3** | 单因素/两因素扫参 + **300 组 Monte Carlo**（配对样本）+ **4800 次站立安全筛查** + Pareto 推荐 | `outputs/M3_param_study/`（`recommended_params.yaml`、`robustness_summary.csv`、`mc_standstill_summary.csv`） |
 | 附加 | 贡献分离实验（速度阻尼 / 加速度反馈 / 阻力补偿的净效果） | `outputs/contributions/ablation_metrics.csv` |
