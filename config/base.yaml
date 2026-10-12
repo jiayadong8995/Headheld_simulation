@@ -1,0 +1,206 @@
+# =============================================================================
+# assist_sim base configuration
+# 单位一律采用 SI；每个参数标注来源，严禁把 ASSUMED 当成 MEASURED 事实。
+#   SPEC      = 厂家规格书可直接引用的事实（M0603B_235）
+#   USER_MODEL= 任务书中已有的模型/约定（含任务书给出的示例初值）
+#   ASSUMED   = 仿真假设占位值，待实机辨识
+#   MEASURED  = 未来实机实测（当前为空）
+# =============================================================================
+
+metadata:
+  version: '1.1'
+  all_unmarked_physical_parameters_are_assumed: true
+  note: '示例占位参数，不是样机实测。规格书数值单独标记 SPEC。'
+
+simulation:
+  dt_plant_s: 0.001
+  T_control_s: 0.010
+  default_duration_s: 7.0
+  random_seed: 20261012
+  integrator: euler            # euler | rk4  (粘滑工况自动使用半隐式 euler)
+  sensor_rate_hz: 100.0        # ASSUMED，与 100Hz 闭环调度一致
+
+mechanics:
+  m_side_kg: 4.0               # ASSUMED, 待辨识
+  r_m: 0.04                    # ASSUMED, 待测量
+  reduction_ratio_G: 1.0       # ASSUMED, 直驱时取1
+  efficiency_eta: 1.0          # ASSUMED, 力级模型用；电机级模型需标定
+  enable_sticking_friction: true   # 粘滑版本独立开关
+  stick_velocity_threshold_mps: 0.004  # ASSUMED, 零速锁定阈值
+  stick_dwell_s: 0.02                 # ASSUMED, 防数值频繁切换的滞回驻留
+  friction:
+    b_Ns_per_m: 2.0            # ASSUMED
+    vs_mps: 0.06               # ASSUMED
+    v_epsilon_mps: 0.015       # ASSUMED
+    dry:
+      Fc_N: 1.5                # ASSUMED
+      Fs_N: 2.5                # ASSUMED
+    wet:
+      Fc_N: 3.5                # ASSUMED
+      Fs_N: 5.0                # ASSUMED
+    new_brush:
+      Fc_N: 2.8                # ASSUMED
+      Fs_N: 4.5                # ASSUMED
+  brush:
+    bias_N: 0.0                # ASSUMED; 支持有符号值
+    ripple_amplitude_N: 0.5    # ASSUMED
+    ripple_frequency_Hz: 6.0   # ASSUMED
+    noise_std_N: 0.0           # ASSUMED, 有色噪声（一阶低通白噪声）
+    noise_cutoff_Hz: 2.0       # ASSUMED
+    seed: 20261012
+
+motor_spec:
+  model: M0603B_235
+  rated_torque_Nm: 0.25        # SPEC
+  stall_torque_Nm: 0.85        # SPEC —— 不是允许持续的峰值
+  rated_speed_rpm: 98          # SPEC
+  no_load_speed_nominal_rpm: 210  # SPEC
+  rated_current_A: 0.5         # SPEC —— 未知是否 i_q
+  stall_current_upper_A: 3.0   # SPEC
+  nominal_voltage_V: 14.4      # SPEC
+  min_voltage_V: 12.0          # SPEC
+  max_voltage_V: 28.0          # SPEC
+  encoder_bits: 12             # SPEC
+  uart_baud: 115200            # SPEC
+  uart_frame_bytes: 10         # SPEC
+  current_command_full_scale_A: 8.0  # SPEC(协议刻度) != 安全工作额定值
+  torque_constant_Nm_per_iq_A: null # MEASURED 待标定，不要按额定电流猜测
+  bus_overcurrent_trip_A: 2.8        # SPEC, 持续>5s 停机保护
+
+actuator:
+  tau_force_s: 0.040           # ASSUMED
+  delay_s: 0.020               # ASSUMED
+  force_slew_limit_Nps: 30.0   # ASSUMED
+  use_conservative_rated_torque_as_limit: true
+  allow_stall_torque_as_continuous_limit: false
+  model_speed_torque_curve: false  # 无厂家实测曲线，禁用猜测
+  missing_packet_probability: 0.0
+  watchdog_timeout_s: 0.1      # ASSUMED, 需与串口真实时序校准
+  force_limit_override_N: null # 若给出则直接覆盖由转矩换算的力上限（调试用）
+
+sensors:
+  imu:
+    accel_noise_std_mps2: 0.08   # ASSUMED
+    accel_bias_mps2: 0.03        # ASSUMED
+    tilt_deg: 0.0                # ASSUMED, 重力投影误差
+    vibration_amplitude_mps2: 0.0  # ASSUMED
+    vibration_frequency_Hz: 6.0  # ASSUMED
+  encoder:
+    speed_noise_std_mps: 0.01    # ASSUMED
+    slip_fraction: 0.0           # ASSUMED
+    quantization_mps: 0.0        # ASSUMED, 12bit 编码器测速量化等效
+  fusion:
+    complementary_encoder_weight_lambda: 0.1
+    accel_lpf_cutoff_Hz: 10.0
+    enable_bias_estimator: false
+    bias_estimator_gain: 0.02
+    mode: complementary          # complementary | kalman
+    kalman_q_v: 1.0e-3
+    kalman_q_b: 1.0e-6
+    kalman_r_v: 1.0e-3
+
+controllers:
+  shared:
+    speed_stop_deadband_mps: 0.03  # ASSUMED
+    start_hysteresis_s: 0.08       # ASSUMED
+    stop_hysteresis_s: 0.15        # ASSUMED
+    enable_soft_start: true
+    soft_start_time_s: 0.15        # ASSUMED
+    command_timeout_zero_s: 0.3    # ASSUMED, 无有效意图的归零超时
+    max_force_N: 6.25              # ASSUMED (= eta*G*0.25/r，示例保守包络)
+    a_intent_threshold_mps2: 0.2   # ASSUMED, 启动意图加速度阈值
+    reverse_hold_s: 0.3            # ASSUMED, 换向过渡窗口
+  C1_existing:
+    status: 'PLACEHOLDER, replace with actual firmware coefficients'
+    force_base_N: 0.0
+    accel_gain_force_equivalent_kg: 0.3
+    accel_lpf_tau_s: 0.02          # ASSUMED, 现有固件的加速度低通
+    phases: ['REST','START','FORWARD','BACKWARD','STOP']
+    stop_command_scale: 0.25       # 与 C2/C3 同款安全外壳，按任务书 4.1
+  C2_impedance:
+    Ka_kg: 1.4                   # 0.35 * m_side_kg
+    Bd_Ns_per_m: 4.0
+  C3_impedance_comp:
+    Ka_kg: 1.4
+    Bd_Ns_per_m: 4.0
+    alpha_D: 0.5
+    estimated_Fc_N: 1.5
+    estimated_b_Ns_per_m: 2.0
+    velocity_compensation_deadband_mps: 0.03
+    comp_ramp_velocity_mps: 0.06   # 阻力补偿软切换斜坡宽度
+  C5_admittance:
+    Md_adm_kg: 2.6
+    Bd_adm_Ns_per_m: 4.0
+    Kp: 25.0
+    Ki: 5.0
+    ff_gain: 1.0
+    integral_limit_Ns: 5.0
+    use_true_force: false        # true -> C5_oracle_force（不可部署）
+
+estimator:
+  accel_lpf_cutoff_Hz: 10.0      # 与 sensors.fusion 保持一致
+
+human:
+  fixed_force_N_per_side: 5.0
+  force_max_N_per_side: 8.0
+  kp_N_per_m: 20.0
+  kd_Ns_per_m: 7.0
+  reaction_delay_s: 0.10
+  force_response_time_constant_s: 0.15
+  force_slew_limit_Nps: 60.0     # ASSUMED, 人类最大用力变化率
+  force_noise_std_N: 0.0         # ASSUMED
+  # 三组保守虚拟人变体（防止结论只由一种虚拟人决定）
+  variants:
+    soft:   {kp_N_per_m: 12.0, kd_Ns_per_m: 4.0, reaction_delay_s: 0.15, force_max_N_per_side: 6.0}
+    mid:    {kp_N_per_m: 20.0, kd_Ns_per_m: 7.0, reaction_delay_s: 0.10, force_max_N_per_side: 8.0}
+    stiff:  {kp_N_per_m: 30.0, kd_Ns_per_m: 10.0, reaction_delay_s: 0.12, force_max_N_per_side: 10.0}
+
+sweeps:
+  Ka_over_m_nominal: [0.0, 0.2, 0.35, 0.5, 0.6]
+  Bd_Ns_per_m: [2.0, 4.0, 8.0]
+  alpha_D: [0.0, 0.5, 0.8, 1.0]
+  tau_force_s: [0.02, 0.04, 0.08]
+  monte_carlo_runs: 300
+  mc_scenarios: ['S03', 'S08', 'S09']
+
+monte_carlo:               # 全部 ASSUMED，仅用于暴露不稳定区的探索分布
+  m_ratio: [0.75, 1.25]
+  b_ratio: [0.5, 1.5]
+  Fc_ratio: [0.6, 1.7]
+  Fs_ratio: [0.7, 1.5]
+  brush_bias_N: [-1.0, 1.0]
+  ripple_amplitude_N: [0.0, 1.5]
+  ripple_frequency_Hz: [2.0, 8.0]
+  tau_F_s: [0.02, 0.08]
+  delay_s: [0.0, 0.06]
+  packet_loss_set: [0.0, 0.01, 0.05]
+  imu_bias_mps2: [-0.1, 0.1]
+  tilt_deg: [-2.0, 2.0]
+  slip_fraction: [0.0, 0.15]
+  human_tau_h_s: [0.10, 0.25]
+
+provenance:
+  SPEC: [motor_spec]
+  USER_MODEL:
+    - simulation.dt_plant_s
+    - simulation.T_control_s
+    - mechanics.m_side_kg
+    - mechanics.r_m
+    - mechanics.reduction_ratio_G
+    - mechanics.efficiency_eta
+    - actuator.tau_force_s
+    - actuator.delay_s
+    - sensors.fusion.complementary_encoder_weight_lambda
+    - controllers.shared.speed_stop_deadband_mps
+    - controllers.shared.start_hysteresis_s
+    - controllers.shared.stop_hysteresis_s
+    - human.kp_N_per_m
+    - human.kd_Ns_per_m
+    - human.reaction_delay_s
+    - human.force_response_time_constant_s
+    - sweeps.Ka_over_m_nominal
+    - sweeps.Bd_Ns_per_m
+    - sweeps.alpha_D
+    - sweeps.tau_force_s
+    - sweeps.monte_carlo_runs
+  MEASURED: []

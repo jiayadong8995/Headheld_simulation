@@ -1,0 +1,110 @@
+# =============================================================================
+# 场景矩阵（任务书 §7）：S01–S12 力给定试验 + 人机耦合轨迹任务
+# friction_schedule: [t_switch_s, mode] 序列，t=0 起始；mode: dry/wet/new_brush/ideal
+# =============================================================================
+
+scenarios:
+  S01:
+    name: '理想线性无阻力，正向推力'
+    duration_s: 5.0
+    friction_schedule: [[0.0, ideal]]
+    brush: {bias_N: 0.0, ripple_amplitude_N: 0.0, noise_std_N: 0.0}
+    sensors: {ideal: true}
+    actuator: {ideal: true}
+    human: {type: fixed, profile: push_release, force_N: 5.0}
+    checks: [analytic_impedance, positivity]
+  S02:
+    name: '理想线性无阻力，反向推力'
+    duration_s: 5.0
+    friction_schedule: [[0.0, ideal]]
+    brush: {bias_N: 0.0, ripple_amplitude_N: 0.0, noise_std_N: 0.0}
+    sensors: {ideal: true}
+    actuator: {ideal: true}
+    human: {type: fixed, profile: pull_release, force_N: 5.0}
+    checks: [mirror_sign, analytic_impedance]
+  S03:
+    name: '干地面常规推—松手'
+    duration_s: 7.0
+    friction_schedule: [[0.0, dry]]
+    human: {type: fixed, profile: push_release, force_N: 5.0}
+    checks: [release_stop, no_creep]
+  S04:
+    name: '湿地面常规推—松手'
+    duration_s: 7.0
+    friction_schedule: [[0.0, wet]]
+    human: {type: fixed, profile: push_release, force_N: 5.0}
+    checks: [release_stop]
+  S05:
+    name: '中途 dry→wet→dry'
+    duration_s: 7.0
+    friction_schedule: [[0.0, dry], [2.5, wet], [4.5, dry]]
+    human: {type: fixed, profile: push_release, force_N: 5.0}
+    checks: [no_surge]
+  S06:
+    name: '更换滚刷，F_br 改变符号/幅值'
+    duration_s: 7.0
+    friction_schedule: [[0.0, dry], [3.5, new_brush]]
+    brush: {bias_schedule: [[0.0, 0.6], [3.5, -0.8]], ripple_amplitude_N: 0.7}
+    human: {type: fixed, profile: push_release, force_N: 5.0}
+    checks: [no_surge, no_creep]
+  S07:
+    name: '小力起步、低速爬行'
+    duration_s: 8.0
+    friction_schedule: [[0.0, dry]]
+    human: {type: fixed, profile: weak_push, force_N: 3.0}
+    checks: [no_creep]
+  S08:
+    name: '快速正反向切换'
+    duration_s: 6.0
+    friction_schedule: [[0.0, dry]]
+    human: {type: fixed, profile: rapid_reverse, force_N: 5.0}
+    checks: [no_overshoot_spike, mirror_sign]
+  S09:
+    name: '人突然松手（非零初速度）'
+    duration_s: 7.0
+    friction_schedule: [[0.0, dry]]
+    human: {type: fixed, profile: push_release_early, force_N: 5.0, release_time_s: 2.5}
+    checks: [release_stop, no_creep]
+  S10:
+    name: '站立无推力，带 IMU 偏置/振动'
+    duration_s: 10.0
+    friction_schedule: [[0.0, dry]]
+    sensors: {imu: {accel_bias_mps2: 0.08, tilt_deg: 1.5, vibration_amplitude_mps2: 0.3}}
+    human: {type: fixed, profile: none, force_N: 0.0}
+    checks: [no_self_start]
+  S11:
+    name: '质量误差 + 打滑 + IMU 倾斜误差'
+    duration_s: 7.0
+    friction_schedule: [[0.0, dry]]
+    plant_overrides: {m_side_kg: 5.0}
+    sensors: {encoder: {slip_fraction: 0.12}, imu: {tilt_deg: 1.8, accel_bias_mps2: 0.06}}
+    human: {type: coupled, task: T1}
+    checks: [robustness]
+  S12:
+    name: '电机限幅 + 40–60ms 延迟/丢包'
+    duration_s: 7.0
+    friction_schedule: [[0.0, dry]]
+    actuator: {delay_s: 0.05, missing_packet_probability: 0.05}
+    human: {type: fixed, profile: push_release, force_N: 5.0}
+    checks: [limits_active, no_self_start]
+
+coupled_tasks:
+  T1:
+    name: '推 +0.8 m 后停止并保持'
+    duration_s: 8.0
+    x_ref_sequence: [[0.0, 0.8, 3.0], [0.8, 0.8, 5.0]]   # [t_start, x_target, t_end]
+  T2:
+    name: '推 +0.8 m，再回拉 -0.8 m，然后停止'
+    duration_s: 12.0
+    x_ref_sequence: [[0.0, 0.8, 5.0], [5.0, 0.0, 10.0], [10.0, 0.0, 12.0]]
+  T3:
+    name: '行程中 40%–60% 突然 dry→wet（或换刷头）'
+    duration_s: 10.0
+    x_ref_sequence: [[0.0, 1.2, 10.0]]
+    friction_switch: {at: 0.4, mode: wet}
+    plant_overrides: {wet: true}
+
+coupled_runs:
+  base_scenarios: ['S03', 'S05', 'S08', 'S09']
+  tasks: [T1, T2]
+  human_variants: [soft, mid, stiff]

@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# 运行产物（体积大，可复现重建；如需交付请单独打包）
+outputs/*/
+!outputs/.gitkeep
+*.log
+*.png
