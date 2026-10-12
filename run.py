@@ -214,8 +214,7 @@ def run_sweep(outdir: Path, cfg: Dict, scenarios_cfg: Dict, seed: int) -> pd.Dat
     for key, grid in grids.items():
         P.plot_heatmap(grid, ka_list, bd_list, figdir, f"grid_{key}.png",
                        f"K_a/m × B_d → {key}", key)
-    pd.DataFrame(grids["F_h_rms"], index=bd_list, columns=ka_list).to_csv(
-        outdir / "grid_F_h_rms.csv")
+        pd.DataFrame(grid, index=bd_list, columns=ka_list).to_csv(outdir / f"grid_{key}.csv")
     return df
 
 

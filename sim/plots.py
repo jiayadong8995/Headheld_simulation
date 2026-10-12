@@ -225,9 +225,13 @@ def plot_heatmap(grid: np.ndarray, xlabels: Sequence, ylabels: Sequence,
     ax.set_ylabel(ylabel)
     ax.set_title(title, fontsize=11)
     fig.colorbar(im, ax=ax, label=cbar_label)
+    vmin, vmax = float(np.nanmin(grid)), float(np.nanmax(grid))
     for i in range(grid.shape[0]):
         for j in range(grid.shape[1]):
-            ax.text(j, i, f"{grid[i, j]:.2f}", ha="center", va="center", color="w", fontsize=7)
+            val = grid[i, j]
+            frac = 0.0 if vmax <= vmin else (val - vmin) / (vmax - vmin)
+            color = "black" if frac > 0.6 else "white"   # 亮底用深色字，保证可读
+            ax.text(j, i, f"{val:.2f}", ha="center", va="center", color=color, fontsize=7)
     fig.tight_layout()
     path = outdir / fname
     fig.savefig(path, dpi=110)
