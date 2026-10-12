@@ -8,7 +8,7 @@
 >
 > 📄 **[算法与验证总结（单文档总览）](ALGORITHM_AND_VALIDATION.md)** ｜
 > 📊 **[自包含 HTML 报告](docs/report.html)**（下载后用浏览器打开）｜
-> 📐 `docs/architecture.png` 控制架构框图 ｜
+> 📐 `docs/architecture.png` 控制架构框图（矢量版 [`docs/architecture.svg`](docs/architecture.svg)）｜
 > 📋 [详细技术报告（逐条回答任务书 7 个问题）](technical_report.md)
 
 本仓库严格按《仿真任务书_交给 Herens.md》V1.0 实施（任务书原件归档于 `docs/task_book/`），
@@ -88,7 +88,7 @@ Headheld_simulation/
   analysis.py                   # 输出 → 报告用 Markdown 数据表
   contributions.py              # 贡献分离实验（速度阻尼 / 加速度反馈 / 阻力补偿）
   make_report_html.py           # 生成自包含 HTML 报告（图片 base64 内嵌）
-  make_architecture_diagram.py  # 生成控制架构框图 docs/architecture.png
+  make_architecture_diagram.py  # 生成控制架构框图 docs/architecture.png + .svg
   config/
     base.yaml                   # 全部带单位参数 + 来源标注（provenance）
     scenarios.yaml              # S01–S12 与耦合任务 T1–T3 定义
@@ -105,7 +105,7 @@ Headheld_simulation/
     plots.py       规定 ≥8 图 + 控制器叠加比较 + 热图
   tests/                        # 6 组硬性检查（27 个用例）
   docs/
-    architecture.png            # 控制与验证架构框图
+    architecture.png / .svg     # 控制与验证架构框图（位图 / 矢量）
     report.html                 # 自包含 HTML 报告
     task_book/                  # 任务书原件归档（任务书 / 初始配置 / 执行指令）
   results/                      # 归档的仿真产物（指标 CSV + 102 张图 + 代表时间序列）

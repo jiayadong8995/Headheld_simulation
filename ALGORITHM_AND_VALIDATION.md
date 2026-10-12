@@ -45,8 +45,22 @@
 **明确不做**（与任务书一致）：双侧差速/转向、滚刷旋转动力学、位置刚度项、母线电流模型（因此不输出电耗/发热）、
 PMSM 电磁建模。
 
-**体系结构**（`docs/architecture.png`）：人手模型 → 被控对象 ⇄ 执行器，传感器 ← 被控对象真值，
-经估计器 → 安全外壳 → 控制器 → 执行器；真值只写入日志，由**离线评价器**读取。
+**体系结构**（`docs/architecture.png`，矢量版 `docs/architecture.svg`）：
+
+信号流为**蛇形单向回路**，所有连线正交走线、走廊与方框分离，无交叉与穿框。
+
+```
+Row 1（左→右）  人机模型 ──F_h──▶ 被控对象 Plant ──真值──▶ 传感器 Sensors ──测量──▶ 状态估计 Estimator
+                                    ▲                                                    │
+                                    │ F_m                                                │ v̂, â
+                                    │                                                    ▼
+Row 2（右→左）  执行器 Actuator ◀── 统一安全外壳 ◀──F_cmd_raw── 控制器组 C0–C5 ◀───────────┘
+                                    （门控 + 限幅）
+```
+
+真值只在**仿真世界**边界内流动，控制器 / 估计器 / 传感器 / 执行器均不导入 `plant`；
+仅 C4a/C4b/C5_oracle 走显式 oracle 通道（红色虚线，标注为不可部署）。
+真值与 `F_cmd`、状态机日志统一送入边界外的**离线评价器**读取，不参与实时控制。
 
 ---
 
@@ -348,13 +362,13 @@ python run.py --standstill-screen 300 --seed 20261012   # 独立站立安全筛�
 python contributions.py                             # 贡献分离
 python analysis.py outputs/M2_full outputs/M3_param_study
 python make_report_html.py                          # 自包含 HTML 报告
-python make_architecture_diagram.py                 # 架构框图
+python make_architecture_diagram.py                 # 架构框图（png + svg）
 pytest -q                                           # 27 passed
 ```
 
 | 文件 | 内容 |
 |---|---|
-| `docs/architecture.png` | 控制与验证架构框图（本文 §1） |
+| `docs/architecture.png` | 控制与验证架构框图（本文 §1，矢量版 `docs/architecture.svg`） |
 | `technical_report.md` | 详细技术报告：方法、逐场景分析、7 问完整推导、参数来源 |
 | `docs/report.html` | 自包含 HTML 报告（图片内嵌，可离线/打印） |
 | `results/metrics/*.csv` | 全部指标表（场景、耦合、扫参、网格、MC、安全筛查、ablation） |
