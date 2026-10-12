@@ -1,11 +1,14 @@
 # Python
 __pycache__/
 *.pyc
-.venv/
 .pytest_cache/
 
-# 运行产物（体积大，可复现重建；如需交付请单独打包）
-outputs/*/
-!outputs/.gitkeep
+# 虚拟环境
+.venv/
+venv/
+
+# 单次运行的工作目录（体积大、可复现重建；归档版本在 results/）
+outputs/
+
+# 日志
 *.log
-*.png

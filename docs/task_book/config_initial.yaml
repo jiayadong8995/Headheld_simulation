@@ -1,0 +1,111 @@
+metadata:
+  version: '1.0'
+  all_unmarked_physical_parameters_are_assumed: true
+  note: '示例占位参数，不是样机实测。规格书数值单独标记 spec。'
+
+simulation:
+  dt_plant_s: 0.001
+  T_control_s: 0.010
+  default_duration_s: 7.0
+  random_seed: 20261012
+
+mechanics:
+  m_side_kg: 4.0              # ASSUMED, 待辨识
+  r_m: 0.04                   # ASSUMED, 待测量
+  reduction_ratio_G: 1.0      # ASSUMED, 直驱时取1
+  efficiency_eta: 1.0         # ASSUMED, 力级模型用；电机级模型需标定
+  friction:
+    b_Ns_per_m: 2.0           # ASSUMED
+    vs_mps: 0.06             # ASSUMED
+    v_epsilon_mps: 0.015     # ASSUMED
+    dry:
+      Fc_N: 1.5               # ASSUMED
+      Fs_N: 2.5               # ASSUMED
+    wet:
+      Fc_N: 3.5               # ASSUMED
+      Fs_N: 5.0               # ASSUMED
+    new_brush:
+      Fc_N: 2.8               # ASSUMED
+      Fs_N: 4.5               # ASSUMED
+  brush:
+    bias_N: 0.0               # ASSUMED; 支持有符号值
+    ripple_amplitude_N: 0.5   # ASSUMED
+    ripple_frequency_Hz: 6.0 # ASSUMED
+    seed: 20261012
+
+motor_spec:
+  model: M0603B_235
+  rated_torque_Nm: 0.25
+  stall_torque_Nm: 0.85 # 不是允许持续的峰值
+  rated_speed_rpm: 98
+  no_load_speed_nominal_rpm: 210
+  rated_current_A: 0.5 # 未知是否 i_q
+  stall_current_upper_A: 3.0
+  nominal_voltage_V: 14.4
+  min_voltage_V: 12.0
+  max_voltage_V: 28.0
+  encoder_bits: 12
+  uart_baud: 115200
+  uart_frame_bytes: 10
+  current_command_full_scale_A: 8.0 # 协议刻度 != 安全工作额定值
+  torque_constant_Nm_per_iq_A: null # MEASURED 待标定，不要按额定电流猜测
+
+actuator:
+  tau_force_s: 0.040          # ASSUMED
+  delay_s: 0.020              # ASSUMED
+  force_slew_limit_Nps: 30.0 # ASSUMED
+  use_conservative_rated_torque_as_limit: true
+  allow_stall_torque_as_continuous_limit: false
+  model_speed_torque_curve: false # 没有厂家实测曲线，暂禁用猜测曲线
+  missing_packet_probability: 0.0
+  watchdog_timeout_s: 0.1    # ASSUMED, 最终需与串口真实时序校准
+
+sensors:
+  imu:
+    accel_noise_std_mps2: 0.08
+    accel_bias_mps2: 0.03
+    tilt_deg: 0.0
+    vibration_amplitude_mps2: 0.0
+  encoder:
+    speed_noise_std_mps: 0.01
+    slip_fraction: 0.0
+  fusion:
+    complementary_encoder_weight_lambda: 0.1
+    accel_lpf_cutoff_Hz: 10.0
+
+controllers:
+  shared:
+    speed_stop_deadband_mps: 0.03  # ASSUMED
+    start_hysteresis_s: 0.08       # ASSUMED
+    stop_hysteresis_s: 0.15        # ASSUMED
+    enable_soft_start: true
+  C1_existing:
+    status: 'PLACEHOLDER, replace with actual firmware coefficients'
+    force_base_N: 0.0
+    accel_gain_force_equivalent_kg: 0.3
+    phases: ['REST','START','FORWARD','BACKWARD','STOP']
+  C2_impedance:
+    Ka_kg: 1.4 # 0.35 * m_side_kg
+    Bd_Ns_per_m: 4.0
+  C3_impedance_comp:
+    Ka_kg: 1.4
+    Bd_Ns_per_m: 4.0
+    alpha_D: 0.5
+    estimated_Fc_N: 1.5
+    estimated_b_Ns_per_m: 2.0
+    velocity_compensation_deadband_mps: 0.03
+
+human:
+  fixed_force_N_per_side: 5.0
+  force_max_N_per_side: 8.0
+  kp_N_per_m: 20.0
+  kd_Ns_per_m: 7.0
+  reaction_delay_s: 0.10
+  force_response_time_constant_s: 0.15
+
+sweeps:
+  Ka_over_m_nominal: [0.0, 0.2, 0.35, 0.5, 0.6]
+  Bd_Ns_per_m: [2.0, 4.0, 8.0]
+  alpha_D: [0.0, 0.5, 0.8, 1.0]
+  tau_force_s: [0.02, 0.04, 0.08]
+  monte_carlo_runs: 300

@@ -1,18 +1,35 @@
 # assist_sim — 双滚刷手持洗地机·单侧半车一维助力控制仿真
 
+[![tests](https://img.shields.io/badge/tests-27%20passed-brightgreen)](#)　[![python](https://img.shields.io/badge/python-3.10%2B-blue)](#)
+
 > 研究对象：左右对称系统中的**单侧半车、单驱动电机**，只模拟前后方向一维平动。
 > 目标：定量比较 **现有电流加速度助力算法 C1** 与 **基于速度/加速度反馈的虚拟阻抗助力算法 C2/C3**，
 > 完成鲁棒性、参数整定与风险结论，交付可复现实验代码、曲线、参数推荐。
+>
+> 📄 **[算法与验证总结（单文档总览）](ALGORITHM_AND_VALIDATION.md)** ｜
+> 📊 **[自包含 HTML 报告](docs/report.html)**（下载后用浏览器打开）｜
+> 📐 `docs/architecture.png` 控制架构框图 ｜
+> 📋 [详细技术报告（逐条回答任务书 7 个问题）](technical_report.md)
 
-本仓库严格按《仿真任务书_交给 Herens.md》V1.0 实施，**不扩展到双侧差速/转向**，不建滚刷旋转动力学，
-不引入位置刚度项；前后滚刷对平动的影响只以合成外力 `F_br` 表征。
+本仓库严格按《仿真任务书_交给 Herens.md》V1.0 实施（任务书原件归档于 `docs/task_book/`），
+**不扩展到双侧差速/转向**，不建滚刷旋转动力学，不引入位置刚度项；前后滚刷对平动的影响只以合成外力 `F_br` 表征。
+
+| 结论速览（基于 300 组 Monte Carlo + 4800 次安全筛查） |
+|---|
+| 速度阻尼 `-B_d·v̂` 是**停稳能力的唯一来源**：松手滑行 0.746 m → **0.036 m**，停稳 2.61 s → **1.23 s** |
+| 加速度反馈 `K_a·â` **单独使用是净负收益**（停不稳 + 更费力 + 电机更累），必须与阻尼成对使用 |
+| 阻力补偿 `α_D·D̂` 是**唯一能把摩擦负担转移给电机的项**：`α_D=0.5` 时 T2 任务手力比传统算法优 **9.2 %** |
+| `α_D=1.0` 会**过补偿**：换刷后松手滑行放大 7 倍，MC 最差样本 1.74 m |
+| **推荐主参数**：`C3，K_a=0.8 kg（K_a/m=0.20）、B_d=4.0 N·s/m、α_D=0.5`（手力 +1.2 %、电机 0.267 N RMS、零低速振荡） |
+| **诚实提示**：300 组随机工况下最优组仅 **63 % 样本优于传统算法**（均值 +1.2 %，尾部 −44 %）→ 仿真不支持"装上就一定省力"，须先实机标定 |
+
 
 ---
 
 ## 1. 快速开始
 
 ```bash
-cd /home/xbd/workspace/Handhell_Simulation
+cd /home/xbd/workspace/Headheld_simulation
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 首次
 
 # M1 最小验证（理想对象解析检验 + 正反向）
@@ -64,23 +81,35 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 首次
 ## 2. 目录结构
 
 ```text
-assist_sim/
-  run.py                  # CLI 入口（--scenario/--sweep/--monte-carlo/--milestone）
+Headheld_simulation/
+  ALGORITHM_AND_VALIDATION.md   # ⭐ 算法与验证总结（单文档总览：模型/控制律/安全壳/全部结果）
+  technical_report.md           # 详细技术报告（逐条回答任务书 7 个问题 + 风险边界）
+  run.py                        # CLI：--scenario / --milestone M1|M2|M3 / --sweep / --monte-carlo / --standstill-screen
+  analysis.py                   # 输出 → 报告用 Markdown 数据表
+  contributions.py              # 贡献分离实验（速度阻尼 / 加速度反馈 / 阻力补偿）
+  make_report_html.py           # 生成自包含 HTML 报告（图片 base64 内嵌）
+  make_architecture_diagram.py  # 生成控制架构框图 docs/architecture.png
   config/
-    base.yaml             # 全部带单位参数 + 每个参数的来源标注（provenance）
-    scenarios.yaml        # S01–S12 与耦合任务 T1–T3 定义
+    base.yaml                   # 全部带单位参数 + 来源标注（provenance）
+    scenarios.yaml              # S01–S12 与耦合任务 T1–T3 定义
   sim/
-    plant.py      单侧动力学、滚刷合力、平滑/粘滑摩擦（+真值接口，只给离线评价）
-    actuator.py   力响应、饱和、速率限制、延迟队列、丢帧、看门狗、失能/急停
-    sensors.py    IMU/轮速、噪声、偏置、倾斜投影、振动、量化、打滑、时间戳、失帧
-    estimator.py  互补滤波（默认）/ 线性 Kalman（可选对照）
+    plant.py       单侧动力学、滚刷合力、平滑/粘滑摩擦（真值接口只给离线评价）
+    actuator.py    力包络、一阶响应、速率限制、延迟队列、丢帧、看门狗、失能/急停
+    sensors.py     IMU/轮速：噪声、偏置、倾斜投影、振动、量化、打滑、时间戳、失帧
+    estimator.py   互补滤波（默认）/ 线性 Kalman（可选对照）
     controllers.py C0/C1/C2/C3 + C4a/C4b 上限对照 + C5 导纳对照 + 统一安全外壳
-    human.py      固定 F_h 波形 + 闭环虚拟用户（反应延迟/速率限制/一阶滞后）
-    metrics.py    统一评价口径（§8）
-    scenarios.py  §6.3 采样顺序的运行器
-    sweep.py      扫参/网格/Monte Carlo/Pareto
-    plots.py      规定 8 图 + 叠加比较 + 热图
-  tests/          6 组硬性检查
+    human.py       固定 F_h 波形 + 闭环虚拟用户（反应延迟/速率限制/一阶滞后）
+    metrics.py     统一评价口径（任务书 §8）
+    scenarios.py   §6.3 采样顺序的运行器
+    sweep.py       扫参/网格/Monte Carlo/Pareto/站立安全筛查
+    plots.py       规定 ≥8 图 + 控制器叠加比较 + 热图
+  tests/                        # 6 组硬性检查（27 个用例）
+  docs/
+    architecture.png            # 控制与验证架构框图
+    report.html                 # 自包含 HTML 报告
+    task_book/                  # 任务书原件归档（任务书 / 初始配置 / 执行指令）
+  results/                      # 归档的仿真产物（指标 CSV + 102 张图 + 代表时间序列）
+  outputs/                      # 每次运行的原始工作目录（gitignore，可重建）
 ```
 
 ## 3. 控制律与仿真要素

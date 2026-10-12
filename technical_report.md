@@ -1,7 +1,7 @@
 # 双滚刷手持式洗地机器人 · 单侧半车一维助力控制仿真技术报告
 
 **版本**：V1.0 ｜ **对应任务书**：《仿真任务书_交给 Herens.md》V1.0
-**代码**：`/home/xbd/workspace/Handhell_Simulation/`（`assist_sim`）
+**代码**：`/home/xbd/workspace/Headheld_simulation/`（`assist_sim`）
 **复现**：`python run.py --milestone M1|M2|M3 --monte-carlo 300 --seed 20261012`（详见 README）
 **测试**：`pytest -q` → **27 passed**（含真值隔离、正反镜像、限幅、松手停稳、不自走、可复现）
 

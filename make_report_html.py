@@ -504,7 +504,7 @@ def build(m2: Path, m3: Path, abl: Path, out: Path) -> Path:
     A(tbl(meas))
 
     A("<h2>10. 复现方式</h2>")
-    A("<pre><code>cd /home/xbd/workspace/Handhell_Simulation\n"
+    A("<pre><code>cd /home/xbd/workspace/Headheld_simulation\n"
       "python -m venv .venv &amp;&amp; .venv/bin/pip install -r requirements.txt\n"
       "python run.py --milestone M1                       # 解析验证\n"
       "python run.py --milestone M2                       # S01–S12 + 耦合任务 T1/T2 × 3 虚拟人\n"
